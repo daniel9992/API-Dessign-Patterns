@@ -1,9 +1,8 @@
 import express from "express";
-import { storeExistsMiddleware } from "middleware/storeAuth";
-// import * as InvCtrl from "../controllers/InventoryController";
-// import * as SaleCtrl from "../controllers/SalesController";
-// import * as RepCtrl from "../controllers/ReportController";
-// import { storeExistsMiddleware } from "../middleware/storeAuth";
+import * as InvCtrl from "../controllers/InventoryController";
+import * as RepCtrl from "../controllers/ReportController";
+import * as SaleCtrl from "../controllers/SalesController";
+import { storeExistsMiddleware } from "../middleware/storeAuth";
 
 const router = express.Router();
 

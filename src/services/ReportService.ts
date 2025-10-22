@@ -51,4 +51,46 @@ export class ReportService {
     // The result is the raw data for the computed 'shoppingLists/lowStock' resource
     return dbService.query(query, [storeId]);
   }
+
+  // --------------------------------------------------------------------------
+  // New Reporting Methods
+  // --------------------------------------------------------------------------
+
+  /**
+   * Retrieves the list of outstanding Purchase resources (isReceived = 0).
+   */
+  public static async getPendingPurchases(storeId: string): Promise<any[]> {
+    const query = `
+            SELECT purchaseId, supplierName, totalCostCents, purchaseDate, employeeUserId
+            FROM Purchases 
+            WHERE storeId = ? AND isReceived = 0
+            ORDER BY purchaseDate ASC
+        `;
+    return dbService.query(query, [storeId]);
+  }
+
+  /**
+   * Retrieves the detailed sales history for a single product within a store.
+   */
+  public static async getProductHistory(
+    storeId: string,
+    productId: string
+  ): Promise<any[]> {
+    // Joins Sales, SaleLineItems, and Users for a comprehensive audit trail
+    const query = `
+            SELECT 
+                T1.saleId, 
+                T1.saleDate, 
+                T2.quantity, 
+                T2.unitPriceCents,
+                T3.name AS employeeName
+            FROM Sales T1
+            JOIN SaleLineItems T2 ON T1.saleId = T2.saleId
+            JOIN Users T3 ON T1.employeeUserId = T3.userId
+            WHERE T1.storeId = ? AND T2.productId = ?
+            ORDER BY T1.saleDate DESC
+        `;
+
+    return dbService.query(query, [storeId, productId]);
+  }
 }
