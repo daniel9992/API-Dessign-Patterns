@@ -10,6 +10,9 @@ import {
 import { HttpError } from "../utils/HttpError";
 import dbService from "./DBService";
 
+interface SimpleInventoryResult {
+  currentStock: number;
+}
 export class InventoryService {
   // --- Core Inventory Check ---
 
@@ -21,12 +24,12 @@ export class InventoryService {
     lineItems: { productId: string; quantity: number }[]
   ): Promise<void> {
     for (const item of lineItems) {
-      const [inventory] = await dbService.query(
+      // Use the SimpleInventoryResult type for the query result
+      const [inventory] = await dbService.query<SimpleInventoryResult>(
         "SELECT currentStock FROM Inventory WHERE storeId = ? AND productId = ?",
         [storeId, item.productId]
       );
 
-      // If stock is not found or is less than the requested quantity
       if (!inventory || inventory.currentStock < item.quantity) {
         throw new HttpError(
           `Insufficient stock for product ${item.productId}. Requested: ${
@@ -100,12 +103,12 @@ export class InventoryService {
     productId: string,
     quantityChange: number,
     performedByUserId: string,
-    adjustmentType: AdjustmentType,
+    adjustmentType: AdjustmentType, // <-- FIXED: Using the defined type
     notes: string = ""
   ): Promise<{ newStock: number }> {
     const timestamp = new Date().toISOString();
 
-    // 1. Log the Adjustment (useful function for control)
+    // 1. Log the Adjustment
     await dbService.run(
       `INSERT INTO StockAdjustments (adjustmentId, storeId, productId, adjustmentType, quantityChange, performedByUserId, adjustmentDate, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -122,7 +125,6 @@ export class InventoryService {
     );
 
     // 2. Update Inventory Singleton Sub-resource
-    // Uses an upsert-like logic: try to update, if 0 rows changed, insert (create new inventory entry).
     const updateResult = await dbService.run(
       `UPDATE Inventory SET currentStock = currentStock + ?, lastUpdated = ? 
          WHERE storeId = ? AND productId = ?`,
@@ -130,7 +132,7 @@ export class InventoryService {
     );
 
     if (updateResult.changes === 0) {
-      // Product doesn't exist in inventory, so create it (useful for initial receiving)
+      // Upsert logic: insert if not found
       await dbService.run(
         `INSERT INTO Inventory (storeId, productId, currentStock, lastUpdated) 
               VALUES (?, ?, ?, ?)`,
@@ -138,8 +140,8 @@ export class InventoryService {
       );
     }
 
-    // Fetch and return the new stock level
-    const [newInventory] = await dbService.query(
+    // 3. Fetch and return the new stock level
+    const [newInventory] = await dbService.query<SimpleInventoryResult>(
       "SELECT currentStock FROM Inventory WHERE storeId = ? AND productId = ?",
       [storeId, productId]
     );
@@ -233,5 +235,35 @@ export class InventoryService {
         `Purchase receipt ${item.purchaseId}`
       );
     }
+  }
+
+  /**
+   * Records all individual products and quantities sold (line items) associated
+   * with a single Sale resource ID.
+   * This is a crucial step to maintain the integrity of the Sale resource.
+   * @param saleId The ID of the parent Sale resource.
+   * @param lineItems Array of products sold in the transaction.
+   */
+  public static async recordSaleLineItems(
+    saleId: string,
+    lineItems: SaleLineItem[]
+  ): Promise<void> {
+    if (lineItems.length === 0) return;
+
+    // We intentionally build and run promises to execute batch inserts
+    const insertPromises = lineItems.map((item) => {
+      const sql = `
+        INSERT INTO SaleLineItems (saleId, productId, quantity, unitPriceCents)
+        VALUES (?, ?, ?, ?)
+      `;
+      return dbService.run(sql, [
+        saleId,
+        item.productId,
+        item.quantity,
+        item.unitPriceCents,
+      ]);
+    });
+
+    await Promise.all(insertPromises);
   }
 }

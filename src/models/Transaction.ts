@@ -15,6 +15,7 @@ export interface Sale {
 
 export interface SaleLineItem {
   productId: string;
+  saleId: string;
   quantity: number;
   unitPriceCents: number;
 }
@@ -36,6 +37,7 @@ export interface Purchase {
 
 export interface PurchaseLineItem {
   productId: string;
+  purchaseId: string;
   quantityOrdered: number;
   costPriceCents: number;
 }
@@ -44,7 +46,10 @@ export interface PurchaseLineItem {
  * 3. Stock Adjustment Log (Inventory Increase/Reduction - Non-Transactional)
  * Models a manual change to inventory (e.g., waste, count correction, transfer).
  */
+
 export type AdjustmentType =
+  | "SALE"
+  | "SUPPLIER_RECEIPT"
   | "LOSS_WASTE"
   | "PHYSICAL_COUNT"
   | "TRANSFER_IN"

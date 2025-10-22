@@ -4,47 +4,65 @@ import { NextFunction, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid"; // Helper for unique IDs
 import { Sale, SaleLineItem } from "../models/Transaction"; // Assuming Transaction models file
 import dbService from "../services/DBService";
-import { type InventoryService } from "../services/InventoryService";
 import { HttpError } from "../utils/HttpError";
+// IMPORTANT: Import the actual InventoryService from its module
+import { InventoryService } from "../services/InventoryService";
 
-// POST /v1/stores/:storeId/sales
+/**
+ * POST /v1/stores/:storeId/sales
+ * Creates a new Sale Resource, triggering transactional inventory reduction.
+ * Adheres to the Resource-Oriented design by using POST on the /sales collection.
+ */
 export const createSale = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   const { storeId } = req.params;
-  const { employeeUserId, totalAmountCents, lineItems } = req.body;
+  // Ensure lineItems are correctly typed
+  const {
+    employeeUserId,
+    totalAmountCents,
+    lineItems,
+  }: {
+    employeeUserId: string;
+    totalAmountCents: number;
+    lineItems: SaleLineItem[];
+  } = req.body;
+
   const saleId = uuidv4();
   const saleDate = new Date().toISOString();
 
-  // Validate core data presence
+  // Validate core data presence (Cap 1: Operational, returning 400)
   if (!employeeUserId || !lineItems || lineItems.length === 0) {
     return next(new HttpError("Missing employee ID or sale line items.", 400));
   }
 
   try {
-    // NOTE: The entire sale processing should be a single database transaction:
-    // 1. Check stock. 2. Record sale. 3. Reduce inventory.
-
     // 1. Check Stock Availability (Critical Pre-validation)
+    // The service throws a 409 Conflict error if stock is insufficient.
     await InventoryService.checkStock(storeId, lineItems);
 
-    // 2. Record the Sale Resource
+    // 2. Record the Sale Resource (Master record)
     await dbService.run(
       `INSERT INTO Sales (saleId, storeId, employeeUserId, saleDate, totalAmountCents)
-             VALUES (?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?)`,
       [saleId, storeId, employeeUserId, saleDate, totalAmountCents]
     );
 
     // 3. Record Sale Line Items (Association Data)
-    // Batch insertion of line items for the Sale resource
+    // Delegating to the service to insert nested data.
     await InventoryService.recordSaleLineItems(saleId, lineItems);
 
     // 4. Inventory Reduction (Core Business Logic)
-    await InventoryService.reduceStock(storeId, lineItems);
+    // Delegating the update of the Inventory Singleton Sub-resource.
+    await InventoryService.reduceStockForSale(
+      storeId,
+      lineItems,
+      employeeUserId
+    ); // Use the more specific service function
 
-    // 5. Standard 201 Created Response, returning the new Sale resource
+    // 5. Standard 201 Created Response, returning the new Sale resource (Cap 1: Predictable)
     const newSale: Sale = {
       saleId,
       storeId,
@@ -55,38 +73,8 @@ export const createSale = async (
     };
     res.status(201).json(newSale);
   } catch (error) {
-    // If an error occurs (e.g., checkStock fails or DB error), the transaction should rollback
+    // Global error handler (in app.ts) catches custom HttpError (like 409 Conflict)
+    // or generic errors (500) and ensures a predictable JSON response.
     next(error);
   }
 };
-
-// --- Sales and Inventory Service Logic (Conceptual) ---
-export class SalesService {
-  public static async recordSaleLineItems(
-    saleId: string,
-    lineItems: SaleLineItem[]
-  ): Promise<void> {
-    // Prepares and executes batch INSERT for lineItems linked to the saleId.
-  }
-}
-
-export class InventoryService {
-  // Checks if there's enough currentStock for all items in lineItems
-  public static async checkStock(
-    storeId: string,
-    lineItems: SaleLineItem[]
-  ): Promise<void> {
-    // Logic to query Inventory table and verify currentStock >= requested quantity.
-    // If inadequate, throw a HttpError(..., 409) (Conflict).
-    return; // Success
-  }
-
-  // Reduces stock based on the completed sale line items
-  public static async reduceStock(
-    storeId: string,
-    lineItems: SaleLineItem[]
-  ): Promise<void> {
-    // Logic to update Inventory table, decrementing currentStock for each productId.
-    // Reuses applyStockChange internally.
-  }
-}
