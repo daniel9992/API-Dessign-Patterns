@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Target moderno compatible con Node.js
+    "module": "NodeNext",
+    // "moduleResolution": "node",
+    // "baseUrl": "src",
+    "outDir": "dist",
+    "sourceMap": true,
+    "esModuleInterop": true, // Facilita la interoperabilidad con módulos CommonJS
+    "skipLibCheck": true, // Omite la verificación de tipos en archivos de definición
+    "strict": true, // Activa todas las verificaciones estrictas
+    "forceConsistentCasingInFileNames": true, // Enforce consistent casing in import statements
+    "noImplicitAny": true,
+    "resolveJsonModule": true, // Permite importar archivos JSON
+    "noEmitOnError": true // No genera archivos si hay errores
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+
+// {
+//   "compilerOptions": {
+//     "module": "NodeNext",
+//     "moduleResolution": "node",
+//     "baseUrl": "src",
+//     "outDir": "dist",
+//     "sourceMap": true,
+//     "noImplicitAny": true
+//   },
+//   "include": ["src/**/*"]
+// }
