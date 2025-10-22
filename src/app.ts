@@ -39,7 +39,7 @@ app.use("/v1", storeRoutes);
 
 // --- 3. Catch-all for Undefined Routes (404) ---
 
-app.all("*", (req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   // If no route matches, return a 404 Not Found error using our custom error class
   next(new HttpError(`Cannot find ${req.originalUrl} on this server!`, 404));
 });
