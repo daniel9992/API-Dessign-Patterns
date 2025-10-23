@@ -59,6 +59,8 @@ export const getLowStockShoppingList = async (
   }
 };
 
+
+
 /**
  * USEFUL FUNCTION: GET /v1/stores/:storeId/stats/productHistory/:productId
  * Retrieves the sales history (transactions and quantity) for a specific product.

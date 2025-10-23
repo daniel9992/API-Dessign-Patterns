@@ -39,28 +39,57 @@ app.use("/v1", storeRoutes);
 
 // --- 3. Catch-all for Undefined Routes (404) ---
 
-app.all("*", (req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   // If no route matches, return a 404 Not Found error using our custom error class
   next(new HttpError(`Cannot find ${req.originalUrl} on this server!`, 404));
 });
 
 // --- 4. Global Error Handling Middleware (Cap 1: Predictable) ---
 
-// This middleware ensures all errors return a predictable JSON structure
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  // Default status is 500 Internal Server Error
-  const status = err instanceof HttpError ? err.statusCode : 500;
-  const message = err.message || "An unexpected error occurred on the server.";
+// Development-specific error handler: sends detailed information
+const sendErrorDev = (err: any, res: Response) => {
+  res.status(err.statusCode).json({
+    status: err.status,
+    error: err,
+    message: err.message,
+    stack: err.stack,
+  });
+};
 
-  // Log the full error stack in development for debugging
-  if (process.env.NODE_ENV === "development") {
-    console.error("API Error:", err);
+// Production-specific error handler: sends minimal, safe information
+const sendErrorProd = (err: any, res: Response) => {
+  // For operational, trusted errors, we send a clear message to the client.
+  if (err.isOperational) {
+    return res.status(err.statusCode).json({
+      status: err.status,
+      message: err.message,
+    });
   }
 
-  res.status(status).json({
+  // For programming or unknown errors, we log the details but send a generic message.
+  // This prevents leaking sensitive implementation details.
+  console.error("UNEXPECTED ERROR 💥:", err);
+  res.status(500).json({
     status: "error",
-    message: message,
+    message: "Something went very wrong on the server.",
   });
+};
+
+// This is the main error handling middleware.
+// It delegates the response to the appropriate handler based on the environment.
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  // Set default values for status and statusCode if they don't exist
+  err.statusCode = err.statusCode || 500;
+  err.status = err.status || "error";
+
+  if (process.env.NODE_ENV === "development") {
+    sendErrorDev(err, res);
+  } else {
+    // In production, we only want to handle specific error cases explicitly.
+    // We create a copy to avoid mutating the original error object.
+    let error = { ...err, message: err.message };
+    sendErrorProd(error, res);
+  }
 });
 
 export default app;
