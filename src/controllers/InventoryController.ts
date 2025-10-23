@@ -72,26 +72,87 @@ export const updateInventory = async (
 
 // --- Inventory Service Logic (Conceptual) ---
 // This is where the complex transaction logic would live.
-export class InventoryService {
-  // This method handles both sales reductions and purchase increases
-  public static async applyStockChange(
-    storeId: string,
-    productId: string,
-    quantityChange: number,
-    performedByUserId: string,
-    notes: string
-  ): Promise<{ newStock: number }> {
-    // NOTE: In a real system, this must be wrapped in a database transaction
-    // to prevent race conditions during concurrent updates.
+import { InventoryService } from "../services/InventoryService";
 
-    // 1. Check if the product exists in the store's inventory. If not, create it.
-    // 2. Calculate new stock: currentStock + quantityChange.
-    // 3. Prevent negative stock if change is a reduction.
-    // 4. Update the Inventory table.
-    // 5. Log the StockAdjustment transaction (if implemented).
+export const createInventoryItem = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { storeId } = req.params;
+  const { productId, quantity } = req.body;
 
-    // Mock result for demonstration:
-    const mockNewStock = 100 + quantityChange;
-    return { newStock: mockNewStock };
+  if (!productId || typeof quantity !== "number") {
+    return next(
+      new HttpError("Missing product ID or quantity in request body.", 400)
+    );
   }
-}
+
+  try {
+    const newItem = await InventoryService.createInventoryItem(
+      storeId,
+      productId,
+      quantity
+    );
+    res.status(201).json(newItem);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInventoryItem = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { storeId, productId } = req.params;
+
+  try {
+    const item = await InventoryService.getInventoryItem(storeId, productId);
+    if (!item) {
+      return next(new HttpError("Inventory item not found.", 404));
+    }
+    res.status(200).json(item);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateInventoryItem = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { storeId, productId } = req.params;
+  const { quantity } = req.body;
+
+  if (typeof quantity !== "number") {
+    return next(new HttpError("Missing quantity in request body.", 400));
+  }
+
+  try {
+    const updatedItem = await InventoryService.updateInventoryItem(
+      storeId,
+      productId,
+      quantity
+    );
+    res.status(200).json(updatedItem);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteInventoryItem = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { storeId, productId } = req.params;
+
+  try {
+    await InventoryService.deleteInventoryItem(storeId, productId);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};

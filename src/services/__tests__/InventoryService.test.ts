@@ -192,4 +192,60 @@ describe('InventoryService', () => {
       await expect(InventoryService.recordSaleLineItems('sale1', lineItems)).rejects.toThrow('DB error');
     });
   });
+
+  describe('createInventoryItem', () => {
+    it('should create and return an inventory item', async () => {
+      (dbService.run as jest.Mock).mockResolvedValue({ changes: 1 });
+      const newItem = await InventoryService.createInventoryItem('store1', 'prod1', 100);
+      expect(newItem).toEqual({ productId: 'prod1', currentStock: 100 });
+      expect(dbService.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw an error if the database insert fails', async () => {
+      (dbService.run as jest.Mock).mockRejectedValue(new Error('DB error'));
+      await expect(InventoryService.createInventoryItem('store1', 'prod1', 100)).rejects.toThrow('DB error');
+    });
+  });
+
+  describe('getInventoryItem', () => {
+    it('should return an inventory item', async () => {
+      const mockItem = { productId: 'prod1', currentStock: 100 };
+      (dbService.query as jest.Mock).mockResolvedValue([mockItem]);
+      const item = await InventoryService.getInventoryItem('store1', 'prod1');
+      expect(item).toEqual(mockItem);
+      expect(dbService.query).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw an error if the database query fails', async () => {
+      (dbService.query as jest.Mock).mockRejectedValue(new Error('DB error'));
+      await expect(InventoryService.getInventoryItem('store1', 'prod1')).rejects.toThrow('DB error');
+    });
+  });
+
+  describe('updateInventoryItem', () => {
+    it('should update and return an inventory item', async () => {
+      (dbService.run as jest.Mock).mockResolvedValue({ changes: 1 });
+      const updatedItem = await InventoryService.updateInventoryItem('store1', 'prod1', 120);
+      expect(updatedItem).toEqual({ productId: 'prod1', currentStock: 120 });
+      expect(dbService.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw an error if the database update fails', async () => {
+      (dbService.run as jest.Mock).mockRejectedValue(new Error('DB error'));
+      await expect(InventoryService.updateInventoryItem('store1', 'prod1', 120)).rejects.toThrow('DB error');
+    });
+  });
+
+  describe('deleteInventoryItem', () => {
+    it('should delete an inventory item', async () => {
+      (dbService.run as jest.Mock).mockResolvedValue({ changes: 1 });
+      await InventoryService.deleteInventoryItem('store1', 'prod1');
+      expect(dbService.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw an error if the database delete fails', async () => {
+      (dbService.run as jest.Mock).mockRejectedValue(new Error('DB error'));
+      await expect(InventoryService.deleteInventoryItem('store1', 'prod1')).rejects.toThrow('DB error');
+    });
+  });
 });

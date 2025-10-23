@@ -244,6 +244,58 @@ export class InventoryService {
    * @param saleId The ID of the parent Sale resource.
    * @param lineItems Array of products sold in the transaction.
    */
+  public static async createInventoryItem(
+    storeId: string,
+    productId: string,
+    quantity: number
+  ): Promise<any> {
+    const timestamp = new Date().toISOString();
+    await dbService.run(
+      `INSERT INTO Inventory (storeId, productId, currentStock, lastUpdated)
+            VALUES (?, ?, ?, ?)`,
+      [storeId, productId, quantity, timestamp]
+    );
+    return { productId, currentStock: quantity };
+  }
+
+  public static async getInventoryItem(
+    storeId: string,
+    productId: string
+  ): Promise<any> {
+    const [item] = await dbService.query(
+      `SELECT T1.productId, T2.sku, T2.name, T1.currentStock, T2.baseUnits, T1.lastUpdated
+            FROM Inventory T1
+            JOIN Products T2 ON T1.productId = T2.productId
+            WHERE T1.storeId = ? AND T1.productId = ?`,
+      [storeId, productId]
+    );
+    return item;
+  }
+
+  public static async updateInventoryItem(
+    storeId: string,
+    productId: string,
+    quantity: number
+  ): Promise<any> {
+    const timestamp = new Date().toISOString();
+    await dbService.run(
+      `UPDATE Inventory SET currentStock = ?, lastUpdated = ?
+            WHERE storeId = ? AND productId = ?`,
+      [quantity, timestamp, storeId, productId]
+    );
+    return { productId, currentStock: quantity };
+  }
+
+  public static async deleteInventoryItem(
+    storeId: string,
+    productId: string
+  ): Promise<void> {
+    await dbService.run(
+      `DELETE FROM Inventory WHERE storeId = ? AND productId = ?`,
+      [storeId, productId]
+    );
+  }
+
   public static async recordSaleLineItems(
     saleId: string,
     lineItems: SaleLineItem[]
